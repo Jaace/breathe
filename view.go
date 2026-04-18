@@ -71,20 +71,99 @@ func (m model) View() string {
 }
 
 func (m model) renderFinished() string {
-	title := styleLabel.
-		Foreground(lipgloss.Color(ColorLong.Hex())).
-		Render("SESSION COMPLETE")
-	msg := styleDim.Render(fmt.Sprintf("%d focused block(s) today. Press q to quit.", m.todayCount))
+	accent := ColorLong.Hex()
 
-	block := lipgloss.JoinVertical(lipgloss.Center, title, "", msg)
+	title := styleLabel.
+		Foreground(lipgloss.Color(accent)).
+		Render("SESSION COMPLETE")
+	kudos := styleDim.Render("nicely done")
+
+	// Session stats come straight from the config (all N blocks completed
+	// by definition once we hit this screen). Today and week come from the
+	// store so they reflect persisted history across runs.
+	sessionBlocks := m.cfg.Rounds
+	sessionFocus := time.Duration(sessionBlocks) * m.cfg.Work
+
+	now := time.Now()
+	y, mo, d := now.Date()
+	startToday := time.Date(y, mo, d, 0, 0, 0, 0, now.Location())
+	startWeek := startToday.AddDate(0, 0, -6)
+	endWeek := startToday.Add(24 * time.Hour)
+
+	todayBlocks, todaySec := 0, 0
+	weekBlocks, weekSec := 0, 0
+	for _, r := range m.store.Sessions() {
+		if r.Phase != PhaseWork.String() {
+			continue
+		}
+		if !r.TS.Before(startToday) && r.TS.Before(endWeek) {
+			todayBlocks++
+			todaySec += r.DurationSec
+		}
+		if !r.TS.Before(startWeek) && r.TS.Before(endWeek) {
+			weekBlocks++
+			weekSec += r.DurationSec
+		}
+	}
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(ColorDim.Hex())).
+		Width(14).
+		Align(lipgloss.Right)
+	valueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(accent)).
+		Bold(true).
+		PaddingLeft(2)
+
+	row := func(label, value string) string {
+		return lipgloss.JoinHorizontal(lipgloss.Top, labelStyle.Render(label), valueStyle.Render(value))
+	}
+
+	stats := lipgloss.JoinVertical(lipgloss.Left,
+		row("this session", fmt.Sprintf("%d blocks · %s", sessionBlocks, formatFocus(sessionFocus))),
+		row("today", fmt.Sprintf("%d blocks · %s", todayBlocks, formatFocus(time.Duration(todaySec)*time.Second))),
+		row("last 7 days", fmt.Sprintf("%d blocks · %s", weekBlocks, formatFocus(time.Duration(weekSec)*time.Second))),
+	)
+
+	hint := styleHelp.Render("press q to quit")
+
+	block := lipgloss.JoinVertical(lipgloss.Center,
+		title,
+		kudos,
+		"",
+		stats,
+		"",
+		hint,
+	)
 	framed := styleFrame.
-		BorderForeground(lipgloss.Color(ColorLong.Hex())).
+		BorderForeground(lipgloss.Color(accent)).
 		Width(columnWidth).
 		Render(block)
 	if m.width > 0 && m.height > 0 {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, framed)
 	}
 	return framed
+}
+
+// formatFocus renders a Duration as a compact "1h 25m" / "45m" / "30s"
+// string suitable for the completion screen.
+func formatFocus(d time.Duration) string {
+	if d <= 0 {
+		return "0m"
+	}
+	total := int(d.Round(time.Second).Seconds())
+	h := total / 3600
+	m := (total % 3600) / 60
+	switch {
+	case h > 0 && m > 0:
+		return fmt.Sprintf("%dh %dm", h, m)
+	case h > 0:
+		return fmt.Sprintf("%dh", h)
+	case m > 0:
+		return fmt.Sprintf("%dm", m)
+	default:
+		return fmt.Sprintf("%ds", total)
+	}
 }
 
 func formatCountdown(d time.Duration) string {
