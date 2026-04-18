@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -33,7 +34,15 @@ func (m model) View() string {
 		Foreground(lipgloss.Color(phaseColor)).
 		Render(formatCountdown(remaining))
 
-	bar := m.renderBar(phaseColor)
+	// During break phases, replace the progress bar with a guided
+	// breathing coach so the UI nudges the user to do something with the
+	// rest, not just watch a bar tick down.
+	var mainVisual string
+	if phase.Kind == PhaseWork {
+		mainVisual = m.renderBar(phaseColor)
+	} else {
+		mainVisual = m.renderBreathingCoach(phaseColor)
+	}
 	dots := m.renderDots()
 	footer := m.renderFooter(phaseColor)
 
@@ -48,7 +57,7 @@ func (m model) View() string {
 		countdown,
 		pausedNote,
 		"",
-		bar,
+		mainVisual,
 		"",
 		dots,
 		"",
@@ -225,6 +234,48 @@ func (m model) renderBar(phaseColor string) string {
 	return b.String()
 }
 
+// renderBreathingCoach renders two stacked lines — an instruction and a
+// centered dot pattern — that pulse with the same breathPhase that drives
+// the outer-ring ripple. The dot pattern expands on the inhale (from 1
+// dot up to 9) and contracts on the exhale. Shown in place of the
+// progress bar during break phases.
+func (m model) renderBreathingCoach(phaseColor string) string {
+	width := columnWidth - 8
+	if width < 10 {
+		width = 10
+	}
+
+	// inhale: normalized 0 at full exhale, 1 at full inhale. sin > 0 means
+	// we're on the way in (0 → π), sin < 0 means we're on the way out.
+	inhale := (1 - math.Cos(m.breathPhase)) / 2
+	instruction := "breathe in"
+	if math.Sin(m.breathPhase) < 0 {
+		instruction = "breathe out"
+	}
+
+	const minDots, maxDots = 1, 9
+	dots := minDots + int(math.Round(inhale*float64(maxDots-minDots)))
+
+	// Dots separated by a single space for readability at larger counts.
+	visual := strings.TrimRight(strings.Repeat("● ", dots), " ")
+
+	instructStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(phaseColor)).
+		Bold(true).
+		Width(width).
+		Align(lipgloss.Center)
+
+	visualStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(phaseColor)).
+		Width(width).
+		Align(lipgloss.Center)
+
+	return lipgloss.JoinVertical(lipgloss.Center,
+		instructStyle.Render(instruction),
+		visualStyle.Render(visual),
+	)
+}
+
 // renderDots draws one glyph per phase. Completed phases are dim, the active
 // dot pulses via the spring (by swapping glyph at pulse thresholds), and
 // upcoming phases are tracked as hollow.
@@ -307,10 +358,15 @@ func (m model) renderMiniTimer(phaseColor string) string {
 	}
 
 	header := lipgloss.JoinHorizontal(lipgloss.Center, interleaveSpaces(parts)...)
-	bar := m.renderBar(phaseColor)
+	var visual string
+	if phase.Kind == PhaseWork {
+		visual = m.renderBar(phaseColor)
+	} else {
+		visual = m.renderBreathingCoach(phaseColor)
+	}
 	dots := m.renderDots()
 
-	return lipgloss.JoinVertical(lipgloss.Center, header, "", bar, "", dots)
+	return lipgloss.JoinVertical(lipgloss.Center, header, "", visual, "", dots)
 }
 
 // interleaveSpaces puts a single-space separator between every element.
