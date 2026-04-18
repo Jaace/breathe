@@ -39,6 +39,14 @@ func ColorSpring() harmonica.Spring {
 	return harmonica.NewSpring(harmonica.FPS(FrameRate), 4.0, 1.0)
 }
 
+// RipplePulseSpring: fast, critically damped. Used as a one-shot decay
+// (kicked to Pos=1, target=0) to drive the celebratory ripple flash on a
+// session dot that just completed. No oscillation — a clean pop that
+// fades in under half a second.
+func RipplePulseSpring() harmonica.Spring {
+	return harmonica.NewSpring(harmonica.FPS(FrameRate), 8.0, 1.0)
+}
+
 // ScalarTracker wraps a single-valued spring (position + velocity + target).
 // Useful for any 1D animated value.
 type ScalarTracker struct {

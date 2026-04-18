@@ -42,10 +42,15 @@ type model struct {
 	displayCount int // discrete digit currently shown (lags behind todayCount)
 
 	// springs
-	progress ScalarTracker
-	pulse    ScalarTracker
-	digit    ScalarTracker
-	color    RGBTracker
+	progress       ScalarTracker
+	pulse          ScalarTracker
+	digit          ScalarTracker
+	color          RGBTracker
+	completedPulse ScalarTracker // one-shot ripple on just-completed dot
+
+	// completedIndex is the phase index of the most recently completed
+	// session dot whose ripple is still animating. -1 when idle.
+	completedIndex int
 
 	// pulse control
 	pulseHi         bool
@@ -81,16 +86,18 @@ func runBubbleTea(cfg SessionConfig, bell Bell) error {
 	initialColor := PalettFor(phases[0].Kind)
 
 	m := model{
-		cfg:          cfg,
-		phases:       phases,
-		bell:         bell,
-		store:        store,
-		todayCount:   today,
-		displayCount: today,
-		progress:     NewScalarTracker(ProgressSpring(), 0),
-		pulse:        NewScalarTracker(PulseSpring(), 1.0),
-		digit:        NewScalarTracker(DigitSpring(), 1.0),
-		color:        NewRGBTracker(initialColor),
+		cfg:            cfg,
+		phases:         phases,
+		bell:           bell,
+		store:          store,
+		todayCount:     today,
+		displayCount:   today,
+		progress:       NewScalarTracker(ProgressSpring(), 0),
+		pulse:          NewScalarTracker(PulseSpring(), 1.0),
+		digit:          NewScalarTracker(DigitSpring(), 1.0),
+		color:          NewRGBTracker(initialColor),
+		completedPulse: NewScalarTracker(RipplePulseSpring(), 0),
+		completedIndex: -1,
 	}
 	m.pulseNextToggle = time.Now().Add(900 * time.Millisecond)
 	m.pulse.SetTarget(1.15)
@@ -224,6 +231,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// Color follows the current phase's palette.
 			m.color.Tick()
+
+			// Completed-dot ripple: single spring decays from 1 to 0
+			// after a phase completes. The View reads Pos to morph the
+			// just-completed dot's glyph/brightness and light up the
+			// flanks.
+			m.completedPulse.Tick()
+			if m.completedPulse.Pos < 0.02 && m.completedIndex >= 0 {
+				m.completedIndex = -1
+			}
 		}
 		return m, tickFrame()
 	}
@@ -265,6 +281,15 @@ func (m model) advancePhase(skipped bool) model {
 		m.phaseIdx = len(m.phases) - 1
 		m.elapsed = m.phases[m.phaseIdx].Duration
 		return m
+	}
+
+	// Kick the ripple on the just-completed dot (only for natural
+	// completions — skipped phases shouldn't get a celebratory pop).
+	if !skipped {
+		m.completedIndex = m.phaseIdx - 1
+		m.completedPulse.Pos = 1.0
+		m.completedPulse.Vel = 0
+		m.completedPulse.Target = 0
 	}
 
 	m.elapsed = 0

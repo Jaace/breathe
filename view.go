@@ -43,8 +43,13 @@ func (m model) View() string {
 	} else {
 		mainVisual = m.renderBreathingCoach(phaseColor)
 	}
-	dots := m.renderDots()
-	footer := m.renderFooter(phaseColor)
+	// Route every centered row through the same Width+Align pipeline so
+	// they all share the identical padding math — relying on JoinVertical
+	// to center some blocks while others use Style.Align leaves half-cell
+	// rounding differences that show up as a 1-column drift.
+	rowStyle := lipgloss.NewStyle().Width(columnWidth - 8).Align(lipgloss.Center)
+	dots := rowStyle.Render(m.renderDots())
+	footer := rowStyle.Render(m.renderFooter(phaseColor))
 
 	pausedNote := ""
 	if m.paused {
@@ -235,10 +240,12 @@ func (m model) renderBar(phaseColor string) string {
 }
 
 // renderBreathingCoach renders two stacked lines — an instruction and a
-// centered dot pattern — that pulse with the same breathPhase that drives
-// the outer-ring ripple. The dot pattern expands on the inhale (from 1
-// dot up to 9) and contracts on the exhale. Shown in place of the
-// progress bar during break phases.
+// centered dot grid — that pulse with the same breathPhase that drives
+// the outer-ring ripple. The grid has a fixed even count of slots
+// (matching the session-dot row's parity so both rows share a center)
+// and the inhale modulates each slot's brightness: at full exhale only
+// the innermost pair glows faintly, and at full inhale every slot is
+// fully lit. Shown in place of the progress bar during break phases.
 func (m model) renderBreathingCoach(phaseColor string) string {
 	width := columnWidth - 8
 	if width < 10 {
@@ -253,11 +260,31 @@ func (m model) renderBreathingCoach(phaseColor string) string {
 		instruction = "breathe out"
 	}
 
-	const minDots, maxDots = 1, 9
-	dots := minDots + int(math.Round(inhale*float64(maxDots-minDots)))
+	// 8 slots = even parity, matches the default 8-phase session row so
+	// both rows center on the same column. Session rows are always even
+	// (BuildSequence yields 2*rounds phases) so parity holds for any
+	// --rounds value.
+	const slots = 8
+	base := m.color.Current()
+	// reach goes from 0 (only the center pair glows faintly) to slots/2
+	// (every slot fully lit) over the inhale.
+	reach := inhale * float64(slots/2)
 
-	// Dots separated by a single space for readability at larger counts.
-	visual := strings.TrimRight(strings.Repeat("● ", dots), " ")
+	parts := make([]string, slots)
+	for k := 0; k < slots; k++ {
+		dist := math.Abs(float64(k) - float64(slots-1)/2)
+		intensity := clamp(reach+1-dist, 0, 1)
+		if intensity < 0.05 {
+			// Keep the cell width stable but visually empty.
+			parts[k] = " "
+			continue
+		}
+		c := ColorBreathOff.Mix(base, intensity)
+		parts[k] = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(c.Hex())).
+			Render("●")
+	}
+	visual := strings.Join(parts, " ")
 
 	instructStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(phaseColor)).
@@ -266,7 +293,6 @@ func (m model) renderBreathingCoach(phaseColor string) string {
 		Align(lipgloss.Center)
 
 	visualStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(phaseColor)).
 		Width(width).
 		Align(lipgloss.Center)
 
@@ -276,38 +302,87 @@ func (m model) renderBreathingCoach(phaseColor string) string {
 	)
 }
 
-// renderDots draws one glyph per phase. Completed phases are dim, the active
-// dot pulses via the spring (by swapping glyph at pulse thresholds), and
-// upcoming phases are tracked as hollow.
+// renderDots draws one glyph per phase. Completed phases are solid, the
+// active dot pulses via the spring (by swapping glyph at pulse
+// thresholds), and upcoming phases are hollow. When a phase has just
+// completed, its dot runs through a brief ripple (glyph morph +
+// brightness flash) and the separators on either side light up with a
+// fading `·`, giving a pulse that radiates one cell outward before
+// settling.
 func (m model) renderDots() string {
 	var b strings.Builder
 	for i, ph := range m.phases {
-		glyph := "○"
-		styled := styleDim
-		switch {
-		case i < m.phaseIdx:
-			glyph = "●"
-			styled = lipgloss.NewStyle().Foreground(lipgloss.Color(PalettFor(ph.Kind).Hex()))
-		case i == m.phaseIdx:
-			activeColor := m.color.Current().Hex()
-			if m.pulse.Pos >= 1.0 {
-				glyph = "●"
-			} else {
-				glyph = "◉"
-			}
-			styled = lipgloss.NewStyle().
-				Foreground(lipgloss.Color(activeColor)).
-				Bold(true)
-		default:
-			glyph = "○"
-			styled = styleDim
-		}
-		b.WriteString(styled.Render(glyph))
+		b.WriteString(m.renderDot(i, ph))
 		if i < len(m.phases)-1 {
-			b.WriteString(styleDim.Render(" "))
+			b.WriteString(m.renderDotSep(i))
 		}
 	}
 	return b.String()
+}
+
+func (m model) renderDot(i int, ph Phase) string {
+	switch {
+	case i < m.phaseIdx:
+		if i == m.completedIndex && m.completedPulse.Pos > 0.05 {
+			return m.renderRippledDot(ph)
+		}
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color(PalettFor(ph.Kind).Hex())).
+			Render("●")
+	case i == m.phaseIdx:
+		glyph := "◉"
+		if m.pulse.Pos >= 1.0 {
+			glyph = "●"
+		}
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color(m.color.Current().Hex())).
+			Bold(true).
+			Render(glyph)
+	default:
+		return styleDim.Render("○")
+	}
+}
+
+// renderRippledDot draws the just-completed dot mid-ripple: glyph morphs
+// from hollow shock ring through a filled ring to solid as the spring
+// decays, and the color blends from bright white back to the pure phase
+// color.
+func (m model) renderRippledDot(ph Phase) string {
+	p := m.completedPulse.Pos
+	var glyph string
+	switch {
+	case p > 0.7:
+		glyph = "◎"
+	case p > 0.4:
+		glyph = "◉"
+	default:
+		glyph = "●"
+	}
+	base := PalettFor(ph.Kind)
+	white := RGB{R: 255, G: 255, B: 255}
+	c := base.Mix(white, 0.5*p)
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color(c.Hex())).
+		Bold(true).
+		Render(glyph)
+}
+
+// renderDotSep returns the single-character separator between dot i and
+// dot i+1. Normally a plain space; during a ripple the separators
+// flanking the just-completed dot light up with a `·` whose brightness
+// fades with the ripple spring.
+func (m model) renderDotSep(i int) string {
+	if m.completedIndex < 0 || m.completedPulse.Pos <= 0.1 {
+		return " "
+	}
+	if i != m.completedIndex && i+1 != m.completedIndex {
+		return " "
+	}
+	base := PalettFor(m.phases[m.completedIndex].Kind)
+	dimmed := ColorBreathOff.Mix(base, m.completedPulse.Pos*0.75)
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color(dimmed.Hex())).
+		Render("·")
 }
 
 // renderFooter shows the "today" counter as a vertically stacked block:
