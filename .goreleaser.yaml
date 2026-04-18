@@ -90,3 +90,16 @@ homebrew_casks:
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
+    # Casks normally inherit macOS Gatekeeper quarantine, which would block
+    # the unsigned binary from running. Strip the quarantine attribute on
+    # install so users don't have to clear it themselves. (Long-term fix
+    # is full sign + notarize via an Apple Developer account; this is the
+    # accepted workaround until then.)
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr",
+                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/breathe"],
+                           sudo: false
+          end

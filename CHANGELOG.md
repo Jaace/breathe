@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-18
+
+### Fixed
+
+- Homebrew install no longer trips macOS Gatekeeper. The cask now
+  strips `com.apple.quarantine` from the installed binary in a
+  `postflight` hook, so `breathe` runs out of the box. Existing
+  v0.1.0 installs can fix themselves locally with
+  `xattr -dr com.apple.quarantine "$(brew --prefix breathe)"`, or
+  just `brew upgrade breathe` once v0.1.1 is published.
+
 ## [0.1.0] - 2026-04-18
 
 First public release.
@@ -42,5 +53,6 @@ First public release.
   builds darwin / linux / windows binaries on every `v*` tag and
   publishes a Homebrew cask via `Jaace/homebrew-tap`.
 
-[Unreleased]: https://github.com/Jaace/breathe/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Jaace/breathe/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Jaace/breathe/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Jaace/breathe/releases/tag/v0.1.0
