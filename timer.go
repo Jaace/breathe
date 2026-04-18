@@ -101,8 +101,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// All controls stay live whether the help overlay is open or not;
+		// the timer keeps ticking either way. Only `q` is context sensitive:
+		// it closes the overlay when open, and quits otherwise.
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "ctrl+c":
 			return m, tea.Quit
 		case " ", "space":
 			m.paused = !m.paused
@@ -116,6 +119,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "?":
 			m.showHelp = !m.showHelp
 			return m, nil
+		case "esc":
+			if m.showHelp {
+				m.showHelp = false
+			}
+			return m, nil
+		case "q":
+			if m.showHelp {
+				m.showHelp = false
+				return m, nil
+			}
+			return m, tea.Quit
 		}
 		return m, nil
 

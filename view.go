@@ -11,6 +11,9 @@ import (
 const columnWidth = 52
 
 func (m model) View() string {
+	if m.showHelp {
+		return m.renderHelpOverlay()
+	}
 	if m.finished {
 		return m.renderFinished()
 	}
@@ -191,8 +194,139 @@ func (m model) renderFooter(phaseColor string) string {
 }
 
 func (m model) renderHelp() string {
-	if m.showHelp {
-		return styleHelp.Render("space pause  ·  s skip  ·  r reset  ·  q quit  ·  ? close help")
-	}
 	return styleHelp.Render("space pause  ·  s skip  ·  r reset  ·  q quit  ·  ? help")
+}
+
+// renderMiniTimer is a compact header used at the top of the help overlay
+// so the user doesn't lose sight of the active session: phase + countdown,
+// a narrow progress bar, and session dots.
+func (m model) renderMiniTimer(phaseColor string) string {
+	if m.finished {
+		return styleDim.Render("session complete")
+	}
+
+	phase := m.phases[m.phaseIdx]
+	remaining := phase.Duration - m.elapsed
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	phaseStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(phaseColor)).
+		Bold(true)
+
+	parts := []string{
+		phaseStyle.Render(phase.Kind.Label()),
+		styleDim.Render("·"),
+		phaseStyle.Render(formatCountdown(remaining)),
+	}
+	if m.paused {
+		parts = append(parts, styleDim.Render("·"), styleDim.Render("paused"))
+	}
+
+	header := lipgloss.JoinHorizontal(lipgloss.Center, interleaveSpaces(parts)...)
+	bar := m.renderBar(phaseColor)
+	dots := m.renderDots()
+
+	return lipgloss.JoinVertical(lipgloss.Center, header, "", bar, "", dots)
+}
+
+// interleaveSpaces puts a single-space separator between every element.
+func interleaveSpaces(parts []string) []string {
+	if len(parts) <= 1 {
+		return parts
+	}
+	out := make([]string, 0, len(parts)*2-1)
+	for i, p := range parts {
+		if i > 0 {
+			out = append(out, " ")
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// renderHelpOverlay replaces the main view with a full keybinding / flag
+// reference. A minimal timer header stays visible at the top so the user
+// still knows where they are in the session. Dismissed with `?`, `q`, or
+// `esc`.
+func (m model) renderHelpOverlay() string {
+	phaseColor := m.color.Current().Hex()
+
+	miniTimer := m.renderMiniTimer(phaseColor)
+
+	title := styleLabel.
+		Foreground(lipgloss.Color(phaseColor)).
+		Render("HELP")
+
+	// Single consistent layout for both tables: right-aligned key column,
+	// fixed-width desc column, so KEYS and FLAGS share the exact same
+	// internal grid and feel tidy when stacked.
+	const (
+		keyColW  = 11
+		descColW = 28
+	)
+	keyCol := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(phaseColor)).
+		Bold(true).
+		Width(keyColW).
+		Align(lipgloss.Right)
+	descCol := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(ColorText.Hex())).
+		Width(descColW).
+		PaddingLeft(2)
+
+	row := func(key, desc string) string {
+		return lipgloss.JoinHorizontal(lipgloss.Top, keyCol.Render(key), descCol.Render(desc))
+	}
+
+	keys := lipgloss.JoinVertical(lipgloss.Left,
+		row("space", "pause / resume"),
+		row("s", "skip current phase"),
+		row("r", "reset current phase"),
+		row("?", "toggle this help"),
+		row("q, ctrl+c", "quit"),
+	)
+
+	sectionTitle := func(s string) string {
+		return styleDim.Bold(true).Render(s)
+	}
+
+	flagsBlock := lipgloss.JoinVertical(lipgloss.Left,
+		row("--work", "work block (25m)"),
+		row("--short", "short break (5m)"),
+		row("--long", "long break (15m)"),
+		row("--rounds", "blocks per cycle (4)"),
+		row("--no-bell", "silence notifications"),
+		row("--sound", "macOS built-in sound"),
+		row("--bell-cmd", "custom shell command"),
+	)
+
+	hint := styleHelp.Render("press ? or q to close")
+
+	column := lipgloss.JoinVertical(lipgloss.Center,
+		miniTimer,
+		"",
+		title,
+		"",
+		sectionTitle("KEYS"),
+		"",
+		keys,
+		"",
+		sectionTitle("FLAGS"),
+		"",
+		flagsBlock,
+		"",
+		hint,
+	)
+
+	framed := styleFrame.
+		BorderForeground(lipgloss.Color(phaseColor)).
+		Width(columnWidth).
+		Render(column)
+
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, framed)
+	}
+	return framed
 }
