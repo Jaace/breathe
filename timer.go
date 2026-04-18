@@ -2,10 +2,16 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// BreathCycleSeconds is the duration of one full inhale-exhale cycle used
+// by the ambient ring ripple around the main frame. 10s (≈6 bpm) lands in
+// the deep, meditative range yoga and box-breathing settle on.
+const BreathCycleSeconds = 10.0
 
 type tickFrameMsg time.Time
 
@@ -47,6 +53,12 @@ type model struct {
 
 	// transient transition state
 	transitioning bool
+
+	// breathPhase advances continuously in [0, 2π) regardless of paused
+	// or finished state. Feeds a sine modulator on the border so the
+	// frame visibly breathes. Sine (not a spring) because breathing is a
+	// periodic waveform, not an impulse response.
+	breathPhase float64
 
 	// UI
 	width    int
@@ -145,6 +157,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.lastTick = now
 
+		// Breath keeps moving regardless of pause or finish: the UI
+		// should feel alive even during a break or after the session ends.
+		m.breathPhase += 2 * math.Pi * dt.Seconds() / BreathCycleSeconds
+		for m.breathPhase >= 2*math.Pi {
+			m.breathPhase -= 2 * math.Pi
+		}
+
 		if !m.finished {
 			advanced := false
 			if !m.paused {
@@ -210,6 +229,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// ringIntensities returns the current intensity (0..1) of the two outer
+// rings wrapped around the main frame. A "pulse" sweeps outward from the
+// frame through ring 1 and ring 2, then returns inward, over one breath
+// cycle. The sweep uses a cosine easing so it dwells briefly at the
+// extremes (mirroring the natural pause at the top and bottom of a breath)
+// and accelerates through the middle.
+func (m model) ringIntensities() (ring1, ring2 float64) {
+	// p traces 0 → 2 → 0 over one full breath cycle (cosine-eased).
+	p := 1.0 - math.Cos(m.breathPhase)
+	ring1 = math.Max(0, 1-math.Abs(p-1))
+	ring2 = math.Max(0, 1-math.Abs(p-2))
+	return
 }
 
 // advancePhase moves to the next phase in the sequence. skipped=true means

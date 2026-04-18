@@ -59,6 +59,11 @@ var (
 
 	ColorDim  = RGB{R: 90, G: 90, B: 100}
 	ColorText = RGB{R: 220, G: 220, B: 230}
+
+	// ColorBreathOff is the near-background color an outer breathing
+	// ring fades to when the ripple pulse is far from it. Tuned for
+	// dark terminals so an unlit ring is effectively invisible.
+	ColorBreathOff = RGB{R: 24, G: 24, B: 30}
 )
 
 func PalettFor(kind PhaseKind) RGB {

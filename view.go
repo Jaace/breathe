@@ -60,9 +60,11 @@ func (m model) View() string {
 		Width(columnWidth).
 		Render(column)
 
+	rippled := m.wrapWithBreathingRings(framed, m.color.Current())
+
 	help := m.renderHelp()
 
-	block := lipgloss.JoinVertical(lipgloss.Center, framed, help)
+	block := lipgloss.JoinVertical(lipgloss.Center, rippled, help)
 
 	if m.width > 0 && m.height > 0 {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, block)
@@ -139,10 +141,11 @@ func (m model) renderFinished() string {
 		BorderForeground(lipgloss.Color(accent)).
 		Width(columnWidth).
 		Render(block)
+	rippled := m.wrapWithBreathingRings(framed, ColorLong)
 	if m.width > 0 && m.height > 0 {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, framed)
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, rippled)
 	}
-	return framed
+	return rippled
 }
 
 // formatFocus renders a Duration as a compact "1h 25m" / "45m" / "30s"
@@ -404,8 +407,34 @@ func (m model) renderHelpOverlay() string {
 		Width(columnWidth).
 		Render(column)
 
+	rippled := m.wrapWithBreathingRings(framed, m.color.Current())
+
 	if m.width > 0 && m.height > 0 {
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, framed)
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, rippled)
 	}
-	return framed
+	return rippled
+}
+
+// wrapWithBreathingRings nests two extra rounded-border rings outside the
+// rendered frame and fades each one between ColorBreathOff and `base`
+// depending on where the breath "pulse" currently sits. At rest both rings
+// are near-invisible; as the pulse sweeps outward through ring 1 and
+// ring 2, each one lights up in turn, producing a ripple that emanates
+// from the main frame in the same cadence as the breath cycle.
+func (m model) wrapWithBreathingRings(framed string, base RGB) string {
+	i1, i2 := m.ringIntensities()
+
+	ring1Color := ColorBreathOff.Mix(base, i1).Hex()
+	ring2Color := ColorBreathOff.Mix(base, i2).Hex()
+
+	ringStyle := func(hex string) lipgloss.Style {
+		return lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(hex)).
+			Padding(0, 1)
+	}
+
+	ring1 := ringStyle(ring1Color).Render(framed)
+	ring2 := ringStyle(ring2Color).Render(ring1)
+	return ring2
 }
