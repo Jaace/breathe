@@ -20,9 +20,9 @@ func tickFrame() tea.Cmd {
 
 type model struct {
 	// config
-	cfg         SessionConfig
-	phases      []Phase
-	bellEnabled bool
+	cfg    SessionConfig
+	phases []Phase
+	bell   Bell
 
 	// real clock (source of truth)
 	phaseIdx int
@@ -54,7 +54,7 @@ type model struct {
 	showHelp bool
 }
 
-func runBubbleTea(cfg SessionConfig, bellEnabled bool) error {
+func runBubbleTea(cfg SessionConfig, bell Bell) error {
 	phases := BuildSequence(cfg)
 	if len(phases) == 0 {
 		return fmt.Errorf("empty phase sequence")
@@ -71,7 +71,7 @@ func runBubbleTea(cfg SessionConfig, bellEnabled bool) error {
 	m := model{
 		cfg:          cfg,
 		phases:       phases,
-		bellEnabled:  bellEnabled,
+		bell:         bell,
 		store:        store,
 		todayCount:   today,
 		displayCount: today,
@@ -199,9 +199,7 @@ func (m model) advancePhase(skipped bool) model {
 				m.todayCount++
 			}
 		}
-		if m.bellEnabled {
-			fmt.Print("\a")
-		}
+		m.bell.Ring()
 	}
 
 	m.phaseIdx++

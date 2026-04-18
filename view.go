@@ -174,32 +174,20 @@ func (m model) renderDots() string {
 	return b.String()
 }
 
-// renderFooter shows the "today" counter. The active digit is rendered with a
-// vertical offset driven by the digit spring so the new digit slides up.
+// renderFooter shows the "today" counter as a vertically stacked block:
+// the digit sits on top, the "today" label below, both centered. When the
+// digit spring is mid-flip (Pos < 0.5) the digit row is briefly blanked out
+// so the new value appears to spring in from below.
 func (m model) renderFooter(phaseColor string) string {
-	label := styleDim.Render("today")
-	digit := m.renderDigit(fmt.Sprintf("%d", m.displayCount), phaseColor)
-	return lipgloss.JoinHorizontal(lipgloss.Center, label, "  ", digit)
-}
-
-// renderDigit renders a number with a 2-line vertical slot so the spring's
-// y-offset is visible. Pos ~ 1 = digit centered; Pos ~ 0 = digit just below.
-func (m model) renderDigit(s, phaseColor string) string {
-	slot := lipgloss.NewStyle().
+	digitStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(phaseColor)).
-		Bold(true).
-		Width(len(s) + 2).
-		Align(lipgloss.Center)
-	top := ""
-	bot := ""
-	if m.digit.Pos > 0.5 {
-		top = slot.Render(s)
-		bot = ""
-	} else {
-		top = ""
-		bot = slot.Render(s)
+		Bold(true)
+	digitRow := digitStyle.Render(fmt.Sprintf("%d", m.displayCount))
+	if m.digit.Pos < 0.5 {
+		digitRow = " "
 	}
-	return lipgloss.JoinVertical(lipgloss.Center, top, bot)
+	label := styleDim.Render("today")
+	return lipgloss.JoinVertical(lipgloss.Center, digitRow, label)
 }
 
 func (m model) renderHelp() string {

@@ -18,6 +18,8 @@ Or grab a prebuilt binary from the [releases page](https://github.com/Jaace/brea
 breathe                 # default 25/5 cycle, 4 rounds, long break at the end
 breathe --work 50m --short 10m --long 30m --rounds 3
 breathe --no-bell       # silent transitions
+breathe --sound glass   # macOS built-in sound (glass, ping, tink, hero, ...)
+breathe --bell-cmd "afplay ~/sounds/ding.wav"   # any shell command
 breathe stats           # today + last-7-days totals
 breathe --version
 ```
@@ -34,15 +36,25 @@ breathe --version
 
 ## Flags
 
-| flag        | default | meaning                          |
-| ----------- | ------- | -------------------------------- |
-| `--work`    | `25m`   | duration of a work block         |
-| `--short`   | `5m`    | duration of a short break        |
-| `--long`    | `15m`   | duration of the long break       |
-| `--rounds`  | `4`     | work blocks before the long break|
-| `--no-bell` | off     | suppress the terminal bell       |
+| flag         | default | meaning                                              |
+| ------------ | ------- | ---------------------------------------------------- |
+| `--work`     | `25m`   | duration of a work block                             |
+| `--short`    | `5m`    | duration of a short break                            |
+| `--long`     | `15m`   | duration of the long break                           |
+| `--rounds`   | `4`     | work blocks before the long break                    |
+| `--no-bell`  | off     | suppress the notification sound entirely             |
+| `--sound`    | —       | macOS built-in sound name (see below)                |
+| `--bell-cmd` | —       | arbitrary shell command to run on phase change       |
 
 Durations accept anything [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration) takes (`90s`, `1h30m`, etc.).
+
+### Notification sound
+
+By default, `breathe` emits a terminal bell (`\a`) on phase change — what that actually sounds like depends on your terminal's bell settings. To pick a specific sound:
+
+- `--sound NAME` plays a built-in macOS alert via `afplay`. Valid names: `basso`, `blow`, `bottle`, `frog`, `funk`, `glass`, `hero`, `morse`, `ping`, `pop`, `purr`, `sosumi`, `submarine`, `tink`. Silently falls back to the terminal bell on non-macOS systems.
+- `--bell-cmd CMD` runs any shell command you want. Works on Linux (`paplay file.ogg`), macOS (`afplay /path/to/file.wav`), Windows (`powershell ...`), or whatever else. Overrides `--sound` if both are set.
+- `--no-bell` silences everything.
 
 ## Data
 

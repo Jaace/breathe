@@ -25,14 +25,14 @@ func newTestModel(t *testing.T) model {
 	}
 	phases := BuildSequence(cfg)
 	return model{
-		cfg:         cfg,
-		phases:      phases,
-		bellEnabled: false,
-		store:       store,
-		progress:    NewScalarTracker(ProgressSpring(), 0),
-		pulse:       NewScalarTracker(PulseSpring(), 1.0),
-		digit:       NewScalarTracker(DigitSpring(), 1.0),
-		color:       NewRGBTracker(PalettFor(phases[0].Kind)),
+		cfg:      cfg,
+		phases:   phases,
+		bell:     Bell{Enabled: false},
+		store:    store,
+		progress: NewScalarTracker(ProgressSpring(), 0),
+		pulse:    NewScalarTracker(PulseSpring(), 1.0),
+		digit:    NewScalarTracker(DigitSpring(), 1.0),
+		color:    NewRGBTracker(PalettFor(phases[0].Kind)),
 	}
 }
 

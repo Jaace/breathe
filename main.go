@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -36,11 +37,13 @@ Usage:
   breathe --version       print version
 
 Flags:
-  --work       duration of a work block       (default 25m)
-  --short      duration of a short break      (default 5m)
-  --long       duration of the long break     (default 15m)
-  --rounds     work blocks before long break  (default 4)
-  --no-bell    suppress the terminal bell
+  --work        duration of a work block       (default 25m)
+  --short       duration of a short break      (default 5m)
+  --long        duration of the long break     (default 15m)
+  --rounds      work blocks before long break  (default 4)
+  --no-bell     suppress the notification sound
+  --sound NAME  macOS built-in alert sound     (glass, ping, tink, ...)
+  --bell-cmd C  shell command to run on phase change (overrides --sound)
 
 Keys:
   space  pause/resume    s  skip    r  reset    q  quit    ?  help
@@ -54,7 +57,9 @@ func runTimer(args []string) {
 	short := fs.Duration("short", 5*time.Minute, "duration of a short break")
 	long := fs.Duration("long", 15*time.Minute, "duration of the long break")
 	rounds := fs.Int("rounds", 4, "number of work blocks before the long break")
-	noBell := fs.Bool("no-bell", false, "suppress the terminal bell on phase change")
+	noBell := fs.Bool("no-bell", false, "suppress the notification sound on phase change")
+	sound := fs.String("sound", "", "macOS built-in alert sound name (e.g. glass, ping, tink)")
+	bellCmd := fs.String("bell-cmd", "", "shell command to run on phase change; overrides --sound")
 	showVersion := fs.Bool("version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
 		os.Exit(2)
@@ -71,6 +76,13 @@ func runTimer(args []string) {
 		fmt.Fprintln(os.Stderr, "breathe: durations must be > 0")
 		os.Exit(2)
 	}
+	if *sound != "" {
+		if _, ok := macSounds[strings.ToLower(*sound)]; !ok {
+			fmt.Fprintf(os.Stderr, "breathe: unknown --sound %q; valid: %s\n",
+				*sound, strings.Join(MacSoundNames(), ", "))
+			os.Exit(2)
+		}
+	}
 
 	cfg := SessionConfig{
 		Work:   *work,
@@ -78,7 +90,12 @@ func runTimer(args []string) {
 		Long:   *long,
 		Rounds: *rounds,
 	}
-	if err := runBubbleTea(cfg, !*noBell); err != nil {
+	bell := Bell{
+		Enabled: !*noBell,
+		Cmd:     *bellCmd,
+		Sound:   *sound,
+	}
+	if err := runBubbleTea(cfg, bell); err != nil {
 		fmt.Fprintln(os.Stderr, "breathe:", err)
 		os.Exit(1)
 	}
