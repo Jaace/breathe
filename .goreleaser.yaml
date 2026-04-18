@@ -37,6 +37,7 @@ archives:
     files:
       - README.md
       - LICENSE
+      - CHANGELOG.md
 
 release:
   github:
@@ -44,6 +45,21 @@ release:
     name: breathe
   draft: false
   prerelease: auto
+  header: |
+    ## breathe {{ .Tag }}
+
+    See [`CHANGELOG.md`](https://github.com/Jaace/breathe/blob/main/CHANGELOG.md)
+    for the curated, human-readable summary of this release.
+
+    Install or upgrade:
+
+    ```bash
+    brew install Jaace/tap/breathe   # first time
+    brew upgrade breathe             # subsequent updates
+    ```
+  footer: |
+    ---
+    **Full commit log below.**
 
 checksum:
   name_template: "checksums.txt"
