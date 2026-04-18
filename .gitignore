@@ -1,0 +1,13 @@
+# Binaries
+/breathe
+/dist/
+
+# Go test / coverage
+*.test
+*.out
+coverage.*
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/

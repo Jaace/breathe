@@ -1,0 +1,76 @@
+version: 2
+
+project_name: breathe
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: breathe
+    main: .
+    binary: breathe
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+release:
+  github:
+    owner: Jaace
+    name: breathe
+  draft: false
+  prerelease: auto
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^ci:"
+      - "^test:"
+      - "Merge pull request"
+      - "Merge branch"
+
+homebrew_casks:
+  - name: breathe
+    repository:
+      owner: Jaace
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/Jaace/breathe"
+    description: "A Pomodoro timer with physics-based TUI animations."
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
