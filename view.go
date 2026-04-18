@@ -402,7 +402,14 @@ func (m model) renderFooter(phaseColor string) string {
 }
 
 func (m model) renderHelp() string {
-	return styleHelp.Render("space pause  ·  s skip  ·  r reset  ·  q quit  ·  ? help")
+	keys := styleHelp.Render("space pause  ·  s skip  ·  r reset  ·  q quit  ·  ? help")
+	if m.updateAvailable == "" {
+		return keys
+	}
+	notice := styleHelp.
+		Foreground(lipgloss.Color(ColorLong.Hex())).
+		Render(fmt.Sprintf("v%s available  ·  brew upgrade breathe", m.updateAvailable))
+	return lipgloss.JoinVertical(lipgloss.Center, keys, notice)
 }
 
 // renderMiniTimer is a compact header used at the top of the help overlay
@@ -513,6 +520,7 @@ func (m model) renderHelpOverlay() string {
 		row("--no-bell", "silence notifications"),
 		row("--sound", "macOS built-in sound"),
 		row("--bell-cmd", "custom shell command"),
+		row("--no-update-check", "skip daily release check"),
 	)
 
 	hint := styleHelp.Render("press ? or q to close")

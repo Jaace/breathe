@@ -42,9 +42,10 @@ breathe --version
 | `--short`    | `5m`    | duration of a short break                            |
 | `--long`     | `15m`   | duration of the long break                           |
 | `--rounds`   | `4`     | work blocks before the long break                    |
-| `--no-bell`  | off     | suppress the notification sound entirely             |
-| `--sound`    | —       | macOS built-in sound name (see below)                |
-| `--bell-cmd` | —       | arbitrary shell command to run on phase change       |
+| `--no-bell`        | off     | suppress the notification sound entirely             |
+| `--sound`          | —       | macOS built-in sound name (see below)                |
+| `--bell-cmd`       | —       | arbitrary shell command to run on phase change       |
+| `--no-update-check`| off     | skip the once-per-day check for a newer release      |
 
 Durations accept anything [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration) takes (`90s`, `1h30m`, etc.).
 
@@ -59,6 +60,10 @@ By default, `breathe` emits a terminal bell (`\a`) on phase change — what that
 ## Data
 
 Session history lives at `$XDG_DATA_HOME/breathe/state.json` (falls back to `~/.local/share/breathe/state.json`). Append-only, one entry per completed phase.
+
+## Update checks
+
+Once a day, `breathe` quietly asks the GitHub API whether there's a newer release. If there is, the footer shows a small `vX.Y.Z available · brew upgrade breathe` notice. Results are cached at `$XDG_CACHE_HOME/breathe/update-check.json` (falls back to `~/.cache/breathe/`) so the network is hit at most once every 24 hours. Any failure (offline, rate-limited, etc.) is silent. Pass `--no-update-check` to disable the lookup entirely.
 
 ## Build from source
 

@@ -41,9 +41,10 @@ Flags:
   --short       duration of a short break      (default 5m)
   --long        duration of the long break     (default 15m)
   --rounds      work blocks before long break  (default 4)
-  --no-bell     suppress the notification sound
-  --sound NAME  macOS built-in alert sound     (glass, ping, tink, ...)
-  --bell-cmd C  shell command to run on phase change (overrides --sound)
+  --no-bell           suppress the notification sound
+  --sound NAME        macOS built-in alert sound (glass, ping, tink, ...)
+  --bell-cmd CMD      shell command to run on phase change (overrides --sound)
+  --no-update-check   skip the once-per-day check for a newer release
 
 Keys:
   space  pause/resume    s  skip    r  reset    q  quit    ?  help
@@ -60,6 +61,7 @@ func runTimer(args []string) {
 	noBell := fs.Bool("no-bell", false, "suppress the notification sound on phase change")
 	sound := fs.String("sound", "", "macOS built-in alert sound name (e.g. glass, ping, tink)")
 	bellCmd := fs.String("bell-cmd", "", "shell command to run on phase change; overrides --sound")
+	noUpdateCheck := fs.Bool("no-update-check", false, "skip the once-per-day check for a newer release")
 	showVersion := fs.Bool("version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
 		os.Exit(2)
@@ -95,7 +97,7 @@ func runTimer(args []string) {
 		Cmd:     *bellCmd,
 		Sound:   *sound,
 	}
-	if err := runBubbleTea(cfg, bell); err != nil {
+	if err := runBubbleTea(cfg, bell, *noUpdateCheck); err != nil {
 		fmt.Fprintln(os.Stderr, "breathe:", err)
 		os.Exit(1)
 	}

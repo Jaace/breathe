@@ -19,11 +19,30 @@ func tickFrame() tea.Cmd {
 	return tea.Tick(time.Second/time.Duration(FrameRate), func(t time.Time) tea.Msg { return tickFrameMsg(t) })
 }
 
+// updateAvailableMsg is sent once by checkForUpdateCmd when a newer
+// release is available. The payload is the bare semver (no leading "v").
+type updateAvailableMsg string
+
+// checkForUpdateCmd kicks off a background HTTP check against GitHub for
+// the latest breathe release. Runs once on Init; the lookup itself is
+// short-circuited by an on-disk cache (see CheckLatestVersion). On any
+// error it returns nothing, so the timer never blocks on the network.
+func checkForUpdateCmd() tea.Cmd {
+	return func() tea.Msg {
+		latest := CheckLatestVersion(version)
+		if latest == "" {
+			return nil
+		}
+		return updateAvailableMsg(latest)
+	}
+}
+
 type model struct {
 	// config
-	cfg    SessionConfig
-	phases []Phase
-	bell   Bell
+	cfg            SessionConfig
+	phases         []Phase
+	bell           Bell
+	updateCheckOff bool // set when --no-update-check is passed
 
 	// real clock. elapsed is a monotonic accumulator updated every frame
 	// from the real wall-clock delta (dt) since the last tick. Sub-second
@@ -65,13 +84,18 @@ type model struct {
 	// periodic waveform, not an impulse response.
 	breathPhase float64
 
+	// updateAvailable holds the latest version string (without leading
+	// "v") iff a newer release is available. Empty when the check is
+	// disabled, still pending, or we're already on the latest version.
+	updateAvailable string
+
 	// UI
 	width    int
 	height   int
 	showHelp bool
 }
 
-func runBubbleTea(cfg SessionConfig, bell Bell) error {
+func runBubbleTea(cfg SessionConfig, bell Bell, noUpdateCheck bool) error {
 	phases := BuildSequence(cfg)
 	if len(phases) == 0 {
 		return fmt.Errorf("empty phase sequence")
@@ -89,6 +113,7 @@ func runBubbleTea(cfg SessionConfig, bell Bell) error {
 		cfg:            cfg,
 		phases:         phases,
 		bell:           bell,
+		updateCheckOff: noUpdateCheck,
 		store:          store,
 		todayCount:     today,
 		displayCount:   today,
@@ -108,7 +133,10 @@ func runBubbleTea(cfg SessionConfig, bell Bell) error {
 }
 
 func (m model) Init() tea.Cmd {
-	return tickFrame()
+	if m.updateCheckOff {
+		return tickFrame()
+	}
+	return tea.Batch(tickFrame(), checkForUpdateCmd())
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -117,6 +145,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		return m, nil
+
+	case updateAvailableMsg:
+		m.updateAvailable = string(msg)
 		return m, nil
 
 	case tea.KeyMsg:
