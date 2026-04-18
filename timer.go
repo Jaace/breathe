@@ -7,12 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type tickSecondMsg time.Time
 type tickFrameMsg time.Time
-
-func tickSecond() tea.Cmd {
-	return tea.Tick(time.Second, func(t time.Time) tea.Msg { return tickSecondMsg(t) })
-}
 
 func tickFrame() tea.Cmd {
 	return tea.Tick(time.Second/time.Duration(FrameRate), func(t time.Time) tea.Msg { return tickFrameMsg(t) })
@@ -24,9 +19,14 @@ type model struct {
 	phases []Phase
 	bell   Bell
 
-	// real clock (source of truth)
+	// real clock. elapsed is a monotonic accumulator updated every frame
+	// from the real wall-clock delta (dt) since the last tick. Sub-second
+	// precision means the progress spring's target changes continuously,
+	// not in 1-second steps, which removes the "staircase" feel on short
+	// phases.
 	phaseIdx int
 	elapsed  time.Duration
+	lastTick time.Time // zero before the first frame tick
 	paused   bool
 	finished bool
 
@@ -89,7 +89,7 @@ func runBubbleTea(cfg SessionConfig, bell Bell) error {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(tickSecond(), tickFrame())
+	return tickFrame()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -133,41 +133,51 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tickSecondMsg:
-		if m.finished {
-			return m, tickSecond()
-		}
-		if !m.paused {
-			m.elapsed += time.Second
-			if m.elapsed >= m.phases[m.phaseIdx].Duration {
-				m = m.advancePhase(false)
-			}
-		}
-		return m, tickSecond()
-
 	case tickFrameMsg:
-		// Drive every spring toward its current target.
+		now := time.Time(msg)
+
+		// Accumulate wall-clock elapsed for the current phase using the
+		// real dt since the last frame. First tick after Init has a zero
+		// lastTick, so dt is 0 and elapsed doesn't jump.
+		var dt time.Duration
+		if !m.lastTick.IsZero() {
+			dt = now.Sub(m.lastTick)
+		}
+		m.lastTick = now
+
 		if !m.finished {
-			// Progress target normally tracks the real ratio. During the
-			// transition animation the target is held at 0 (after the
-			// brief overshoot dip below 0) so the bar eases back to empty.
-			if !m.transitioning {
-				phaseLen := m.phases[m.phaseIdx].Duration
-				ratio := float64(m.elapsed) / float64(phaseLen)
-				if ratio > 1 {
-					ratio = 1
+			advanced := false
+			if !m.paused {
+				m.elapsed += dt
+				if m.elapsed >= m.phases[m.phaseIdx].Duration {
+					m = m.advancePhase(false)
+					advanced = true
 				}
-				m.progress.SetTarget(ratio)
-			} else if m.progress.Pos < 0.02 {
-				// overshoot has settled; release the transition flag.
-				m.transitioning = false
-				m.progress.SetTarget(0)
+			}
+
+			// Progress target tracks the real fractional elapsed every
+			// frame. During a phase-boundary transition the target is
+			// temporarily driven below zero (see advancePhase) to produce
+			// the overshoot; we release that mode once Pos has settled.
+			// Skip the target/release logic on the same frame we just
+			// advanced so the overshoot target (-0.08) stays in effect.
+			if !advanced {
+				if !m.transitioning {
+					phaseLen := m.phases[m.phaseIdx].Duration
+					ratio := float64(m.elapsed) / float64(phaseLen)
+					if ratio > 1 {
+						ratio = 1
+					}
+					m.progress.SetTarget(ratio)
+				} else if m.progress.Pos < 0.02 {
+					m.transitioning = false
+					m.progress.SetTarget(0)
+				}
 			}
 			m.progress.Tick()
 
 			// Pulse: toggle the target between high and low to keep the
 			// underdamped spring oscillating indefinitely on the active dot.
-			now := time.Time(msg)
 			if now.After(m.pulseNextToggle) {
 				m.pulseHi = !m.pulseHi
 				if m.pulseHi {

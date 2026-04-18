@@ -67,13 +67,25 @@ func TestBuildSequenceSingleRound(t *testing.T) {
 	}
 }
 
-func TestPauseResumeDoesNotAdvanceClock(t *testing.T) {
-	m := newTestModel(t)
-	m.paused = true
-	for i := 0; i < 5; i++ {
-		next, _ := m.Update(tickSecondMsg(time.Now()))
+// advanceTime pushes several frame ticks into the model, separated by the
+// given step (in wall-clock terms seen by the model). Returns the final
+// model and the last "now" used.
+func advanceTime(t *testing.T, m model, start time.Time, step time.Duration, count int) (model, time.Time) {
+	t.Helper()
+	m.lastTick = start
+	last := start
+	for i := 1; i <= count; i++ {
+		last = start.Add(time.Duration(i) * step)
+		next, _ := m.Update(tickFrameMsg(last))
 		m = next.(model)
 	}
+	return m, last
+}
+
+func TestPauseDoesNotAdvanceClock(t *testing.T) {
+	m := newTestModel(t)
+	m.paused = true
+	m, _ = advanceTime(t, m, time.Now(), time.Second, 5)
 	if m.elapsed != 0 {
 		t.Errorf("paused clock advanced: %v", m.elapsed)
 	}
@@ -81,11 +93,13 @@ func TestPauseResumeDoesNotAdvanceClock(t *testing.T) {
 
 func TestClockAdvancesAndAdvancesPhase(t *testing.T) {
 	m := newTestModel(t)
-	// Work duration is 2s in test config; 2 ticks should complete the phase.
-	for i := 0; i < 2; i++ {
-		next, _ := m.Update(tickSecondMsg(time.Now()))
-		m = next.(model)
-	}
+	// Work duration is 2s in test config; stepping 2s of wall clock in
+	// one frame should complete the phase.
+	start := time.Now()
+	m.lastTick = start
+	next, _ := m.Update(tickFrameMsg(start.Add(2 * time.Second)))
+	m = next.(model)
+
 	if m.phaseIdx != 1 {
 		t.Errorf("expected phaseIdx 1 after work completes, got %d", m.phaseIdx)
 	}
@@ -100,6 +114,19 @@ func TestClockAdvancesAndAdvancesPhase(t *testing.T) {
 	}
 }
 
+func TestSubSecondElapsedAccumulates(t *testing.T) {
+	// Verifies the wall-clock fix: elapsed reflects sub-second deltas
+	// rather than only whole-second increments.
+	m := newTestModel(t)
+	start := time.Now()
+	m.lastTick = start
+	next, _ := m.Update(tickFrameMsg(start.Add(250 * time.Millisecond)))
+	m = next.(model)
+	if m.elapsed < 200*time.Millisecond || m.elapsed > 300*time.Millisecond {
+		t.Errorf("expected ~250ms elapsed, got %v", m.elapsed)
+	}
+}
+
 func TestSkipDoesNotRecordOrCountToday(t *testing.T) {
 	m := newTestModel(t)
 	m = m.advancePhase(true)
@@ -110,8 +137,9 @@ func TestSkipDoesNotRecordOrCountToday(t *testing.T) {
 
 func TestResetKey(t *testing.T) {
 	m := newTestModel(t)
-	// advance elapsed a bit
-	next, _ := m.Update(tickSecondMsg(time.Now()))
+	start := time.Now()
+	m.lastTick = start
+	next, _ := m.Update(tickFrameMsg(start.Add(500 * time.Millisecond)))
 	m = next.(model)
 	if m.elapsed == 0 {
 		t.Fatal("elapsed should be non-zero after one tick")
@@ -147,11 +175,10 @@ func TestStoreRecordPersists(t *testing.T) {
 
 func TestFullCycleCompletes(t *testing.T) {
 	m := newTestModel(t)
-	// Sum of durations = 2 (W) + 1 (S) + 2 (W) + 3 (L) = 8 seconds.
-	for i := 0; i < 10; i++ {
-		next, _ := m.Update(tickSecondMsg(time.Now()))
-		m = next.(model)
-	}
+	// Sum of durations = 2 (W) + 1 (S) + 2 (W) + 3 (L) = 8 seconds. Step
+	// the wall-clock forward in 1-second chunks; the model's phase
+	// advancement logic handles the rollover between phases.
+	m, _ = advanceTime(t, m, time.Now(), time.Second, 10)
 	if !m.finished {
 		t.Errorf("expected session finished, still at phaseIdx=%d", m.phaseIdx)
 	}
