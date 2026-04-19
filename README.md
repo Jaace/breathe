@@ -2,7 +2,9 @@
 
 A Pomodoro timer with physics. Every transition — progress bars filling, countdown digits morphing, phase changes, dot pulses — runs through [Harmonica](https://github.com/charmbracelet/harmonica) springs, so nothing snaps or ticks abruptly. The whole thing breathes.
 
-<!-- demo.gif placeholder -->
+[**Live site & demo →**](https://jaace.github.io/breathe/)
+
+![A short recording of breathe running: spring-driven progress bar, breathing rings rippling outward from the frame, color-morphing phase transitions, the breathing coach during a short break, and the session-complete stats card.](docs/demo.gif)
 
 ## Install
 
