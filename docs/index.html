@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A Pomodoro timer with physics. Every transition — progress bars, countdown digits, phase changes, dot pulses — runs through Harmonica springs, so nothing snaps or ticks abruptly. The whole thing breathes.">
+  <title>breathe — A Pomodoro timer with physics</title>
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="breathe — A Pomodoro timer with physics">
+  <meta property="og:description" content="A TUI Pomodoro timer where every transition runs through Harmonica springs. Spring-driven progress bars, color-morphing phase changes, a guided breathing coach during breaks, and ambient ripple rings around the frame.">
+  <meta property="og:url" content="https://jaace.github.io/breathe/">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="breathe — A Pomodoro timer with physics">
+  <meta name="twitter:description" content="A TUI Pomodoro timer where every transition runs through Harmonica springs. The whole thing breathes.">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='14' fill='none' stroke='%237aa6ff' stroke-width='6'/><circle cx='50' cy='50' r='28' fill='none' stroke='%237aa6ff' stroke-width='4' opacity='0.55'/><circle cx='50' cy='50' r='42' fill='none' stroke='%237aa6ff' stroke-width='3' opacity='0.25'/></svg>">
+  <link rel="stylesheet" href="https://jaace.github.io/theme/style.css">
+  <style>
+    .hero-icon {
+      width: 72px;
+      height: 72px;
+      margin-bottom: 1rem;
+      opacity: 0.85;
+    }
+    /* The hero icon's outer rings inherit currentColor; nudge a touch of breath
+       into them on hover so the static page hints at the live ambient ripple. */
+    .hero-icon circle:nth-child(2) { opacity: 0.55; }
+    .hero-icon circle:nth-child(3) { opacity: 0.25; }
+
+    .demo-image {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+    .feature-card {
+      padding: 1.25rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .feature-card h3 {
+      margin: 0 0 0.4rem 0;
+      font-size: 1rem;
+    }
+    .feature-card p {
+      margin: 0;
+      color: var(--color-dim, #aaa);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+    /* Inline <code> defaults to a single unbreakable token. Long paths
+       like $XDG_DATA_HOME/breathe/state.json then punch through the card
+       edge. Allow line-wrapping at any character (only inside cards —
+       elsewhere `code` should still stay on one line). */
+    .feature-card code {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      font-size: 0.88em;
+    }
+
+    .keys-flags-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    @media (min-width: 760px) {
+      .keys-flags-grid { grid-template-columns: 1fr 1fr; }
+    }
+    .keys-flags-grid table { width: 100%; }
+    .keys-flags-grid th { text-align: left; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <span class="nav-brand"><span>~</span>/breathe</span>
+    <div class="nav-right">
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark mode" title="Toggle theme">
+      <svg class="icon-sun" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="display:none">
+        <circle cx="8" cy="8" r="3"/>
+        <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/>
+      </svg>
+      <svg class="icon-moon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M13.5 8.5a5.5 5.5 0 01-7-7 5.5 5.5 0 107 7z"/>
+      </svg>
+    </button>
+    <a href="https://github.com/Jaace/breathe" class="nav-github">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      GitHub
+    </a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <p class="eyebrow">TUI Pomodoro Timer</p>
+    <svg class="hero-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle>
+      <circle cx="12" cy="12" r="6.5"></circle>
+      <circle cx="12" cy="12" r="10"></circle>
+    </svg>
+    <h1>breathe</h1>
+    <p class="byline">by <a href="https://github.com/Jaace">@Jaace</a></p>
+    <p class="tagline">A Pomodoro timer with physics. The whole thing breathes.</p>
+    <div class="install-cta" id="install-cta">
+      <code>brew install Jaace/tap/breathe</code>
+      <button class="copy-btn" id="copy-btn" aria-label="Copy install command" title="Copy">
+        <svg class="icon-copy" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="5" y="5" width="9" height="9" rx="1.5"/>
+          <path d="M11 5V3.5A1.5 1.5 0 009.5 2H3.5A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5"/>
+        </svg>
+        <svg class="icon-check" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+          <polyline points="2.5 8.5 6 12 13.5 4.5"/>
+        </svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- Demo. Source recipe lives at docs/demo.tape; regenerate with
+       `vhs docs/demo.tape` after any visual change to the timer. -->
+  <div class="terminal-section">
+    <img class="demo-image" src="demo.gif" alt="A short recording of breathe running: spring-driven progress bar, breathing rings rippling outward from the frame, color-morphing phase transitions, the breathing coach during a short break, and the session-complete stats card.">
+  </div>
+
+  <!-- What you see -->
+  <section>
+    <h2>What you see</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>Spring-driven progress</h3>
+        <p>Every progress bar, dot pulse, and digit morph runs through a <a href="https://github.com/charmbracelet/harmonica">Harmonica</a> spring. Nothing snaps; everything settles.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Color-morphing phases</h3>
+        <p>Work, short break, and long break each have their own palette. Transitions interpolate the entire UI from one to the next over a brief overshoot.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Ambient ripple rings</h3>
+        <p>Two outer rings encircle the main frame. A pulse sweeps outward and back on a 10-second breath cycle, lighting each ring in turn.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Guided breath coach</h3>
+        <p>During break phases the progress bar steps aside for an inhale/exhale prompt and a dot grid that blooms outward on the inhale, contracts on the exhale.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Persistent stats</h3>
+        <p>Every completed phase is appended to <code>$XDG_DATA_HOME/breathe/state.json</code>. <code>breathe stats</code> renders today + last 7 days through Glamour.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Quiet by default</h3>
+        <p>Terminal bell, a macOS built-in alert (<code>--sound glass</code>), an arbitrary shell command (<code>--bell-cmd</code>), or silence (<code>--no-bell</code>). Your call.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Keys + Flags -->
+  <section>
+    <h2>Keys & flags</h2>
+    <div class="keys-flags-grid">
+      <div>
+        <h3 style="margin-top: 0;">Keys</h3>
+        <table class="model-table">
+          <thead><tr><th>Key</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td><code>space</code></td><td>pause / resume</td></tr>
+            <tr><td><code>s</code></td><td>skip current phase</td></tr>
+            <tr><td><code>r</code></td><td>reset current phase</td></tr>
+            <tr><td><code>?</code></td><td>toggle help overlay</td></tr>
+            <tr><td><code>q</code> / <code>ctrl+c</code></td><td>quit</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3 style="margin-top: 0;">Flags</h3>
+        <table class="model-table">
+          <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--work</code></td><td><code>25m</code></td><td>work block duration</td></tr>
+            <tr><td><code>--short</code></td><td><code>5m</code></td><td>short break duration</td></tr>
+            <tr><td><code>--long</code></td><td><code>15m</code></td><td>long break duration</td></tr>
+            <tr><td><code>--rounds</code></td><td><code>4</code></td><td>blocks per cycle</td></tr>
+            <tr><td><code>--no-bell</code></td><td>off</td><td>silence notifications</td></tr>
+            <tr><td><code>--sound</code></td><td>—</td><td>macOS built-in sound</td></tr>
+            <tr><td><code>--bell-cmd</code></td><td>—</td><td>custom shell command</td></tr>
+            <tr><td><code>--no-update-check</code></td><td>off</td><td>skip daily release check</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="table-note">Durations accept anything <a href="https://pkg.go.dev/time#ParseDuration"><code>time.ParseDuration</code></a> takes (<code>90s</code>, <code>1h30m</code>, etc.).</p>
+  </section>
+
+  <!-- Stats subcommand -->
+  <section>
+    <h2>Stats</h2>
+    <div class="command-callout">
+      <span class="cmd">breathe stats</span>
+      <p>Aggregates today and the rolling last seven days from your session log and renders the report through <a href="https://github.com/charmbracelet/glamour">Glamour</a>. Counts work blocks and total focus minutes per day.</p>
+    </div>
+  </section>
+
+  <!-- Install -->
+  <section>
+    <h2>Install</h2>
+    <span class="code-label">Install (macOS, via Homebrew tap)</span>
+    <div class="code-wrap">
+      <div class="code-block">brew install Jaace/tap/breathe</div>
+      <button class="code-copy-btn" data-copy="brew install Jaace/tap/breathe" aria-label="Copy" title="Copy"><svg class="icon-copy" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2H3.5A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5"/></svg><svg class="icon-check" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><polyline points="2.5 8.5 6 12 13.5 4.5"/></svg></button>
+    </div>
+
+    <span class="code-label">Update</span>
+    <div class="code-wrap">
+      <div class="code-block">brew upgrade breathe</div>
+      <button class="code-copy-btn" data-copy="brew upgrade breathe" aria-label="Copy" title="Copy"><svg class="icon-copy" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2H3.5A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5"/></svg><svg class="icon-check" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><polyline points="2.5 8.5 6 12 13.5 4.5"/></svg></button>
+    </div>
+
+    <span class="code-label">Linux / Windows / from source</span>
+    <div class="code-wrap">
+      <div class="code-block">git clone https://github.com/Jaace/breathe
+cd breathe
+go build -o breathe .</div>
+      <button class="code-copy-btn" data-copy="git clone https://github.com/Jaace/breathe&#10;cd breathe&#10;go build -o breathe ." aria-label="Copy" title="Copy"><svg class="icon-copy" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2H3.5A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5"/></svg><svg class="icon-check" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><polyline points="2.5 8.5 6 12 13.5 4.5"/></svg></button>
+    </div>
+
+    <p class="table-note">Linux and Windows users can also grab a prebuilt binary from the <a href="https://github.com/Jaace/breathe/releases">releases page</a>.</p>
+  </section>
+
+  <footer>
+    <span class="footer-note">Built by <a href="https://github.com/Jaace">@Jaace</a></span>
+    <div class="footer-links">
+      <a href="https://jason-boyle.com" class="footer-site-link"><svg width="14" height="15" viewBox="0 0 710 782" xmlns="http://www.w3.org/2000/svg"><g transform="translate(17.306,0.792)"><g transform="translate(0.5,0.409)"><path d="M112.43,520L337.27,649.81V390.19L112.43,260.38V520Z" fill="#358AC4"/><path d="M337.27,649.81V779.62L0.01,584.91L112.43,520L337.27,649.81Z" fill="#FACF8D"/><path d="M112.43,519.8V258.8L0.01,195.48V584.8L112.43,519.8Z" fill="#D46661"/><path d="M112.43,260.38L337.27,390.19L562.11,260.38L337.27,130.57L112.43,260.38Z" fill="#3996D5"/><path d="M337.27,649.81L562.11,520V260.38L337.27,390.19V649.81Z" fill="#358AC4"/><path d="M337.27,649.81V779.62L674.52,584.91L562.11,520L337.27,649.81Z" fill="#E0B97E"/><path d="M562.11,520V260.38L674.52,195.48V584.91L562.11,520Z" fill="#2ABFA7"/><path d="M562.11,260.38L337.27,130.57V0.76L674.52,195.48L562.11,260.38Z" fill="#31CCB0"/><path d="M112.43,260.38L0.01,195.48L337.27,0.76V130.57L112.43,260.38Z" fill="#EF746D"/></g></g><path d="M-18.09,647.02L1.45,681.02H391.47L371.55,647.52H-18.09Z" fill="#353F52" transform="translate(186.69,664.02)rotate(30)translate(-186.69,-664.02)"/><path d="M-51.26,408.44H727.66L708.13,374.47H-31.77L-51.26,408.44Z" fill="#353F52" transform="translate(338.2,391.46)rotate(270)translate(-338.2,-391.46)"/><path d="M337.17,685.74L692.23,684.37L710.19,651.9H320.42L337.17,685.74Z" fill="#3D4860" transform="translate(515.3,668.82)rotate(150)translate(-515.3,-668.82)"/><path d="M358.01,492.43L726.76,490.32L708.67,456.82L338.26,458.23L358.01,492.43Z" fill="#3D4860" transform="translate(532.51,474.62)rotate(210)translate(-532.51,-474.62)"/><path d="M708.72,135.26L691.15,101.62H338.13L338.19,135.45L708.72,135.26Z" fill="#3D4860" transform="translate(523.43,118.53)rotate(210)translate(-523.43,-118.53)"/><path d="M665.1,323.62H726.21L707.58,289.14H364.82L345.69,323.24L665.1,323.62Z" fill="#3D4860" transform="translate(535.95,306.38)rotate(150)translate(-535.95,-306.38)"/><path d="M744.45,394.55L747.54,361.61H14.31L-4.62,394.55H744.45Z" fill="#3D4860" transform="translate(371.46,378.08)rotate(90)translate(-371.46,-378.08)"/></svg>jason-boyle.com</a>
+      <a href="https://github.com/Jaace/breathe">GitHub</a>
+      <a href="https://github.com/Jaace/breathe/blob/main/CHANGELOG.md">Changelog</a>
+    </div>
+  </footer>
+
+  <script src="https://jaace.github.io/theme/theme.js"></script>
+
+</body>
+</html>
